@@ -41,7 +41,7 @@ uint64_t result = bbcpu_call(function, 2, args);  /* runs it on this thread */
 
 ## Build
 
-Needs clang, cmake and ninja on macOS. Rosetta is needed for the tests, not for bbcpu itself.
+Needs clang, cmake and make on macOS (`xcode-select --install`, `brew install cmake`). Rosetta is needed for the tests, not for bbcpu itself.
 
 ```sh
 bash build.sh                # Zydis into deps/, out/libbbcpu.a, out/hello

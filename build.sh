@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # build.sh: out/libbbcpu.a, the library hosts link (src/cpu), and the example host (out/hello).
 # Zydis, the x86 decoder, is built once into deps/
-# (BB_DEPS: another prefix with libZydis.a and libZycore.a). Needs clang, cmake and ninja.
+# (BB_DEPS: another prefix with libZydis.a and libZycore.a). Needs clang, cmake and make.
 set -euo pipefail
 cd -- "$(dirname -- "$0")"
 D=${BB_DEPS:-deps}
@@ -9,13 +9,13 @@ ZYDIS_VERSION=v4.1.1
 CC=${CC:-clang}
 source tools/cpu/host.sh
 
-# cmake and ninja are only needed for Zydis; check before cloning it, not halfway through.
+# cmake and make are only needed for Zydis; check before cloning it, not halfway through.
 missing=
-for tool in "$CC" $([[ -f $D/lib/libZydis.a ]] || echo cmake ninja); do
+for tool in "$CC" $([[ -f $D/lib/libZydis.a ]] || echo cmake make); do
     command -v "$tool" >/dev/null || missing+=" $tool"
 done
 if [[ -n $missing ]]; then
-    echo "build.sh: missing$missing (macOS: brew install cmake ninja; clang: xcode-select --install)" >&2
+    echo "build.sh: missing$missing (macOS: brew install cmake; clang and make: xcode-select --install)" >&2
     exit 1
 fi
 
@@ -25,17 +25,17 @@ if [[ ! -f $D/lib/libZydis.a ]]; then
     work=$prefix/build
     mkdir -p "$work"
     [[ -d $work/zydis ]] || git -c advice.detachedHead=false clone -q --recursive --depth 1 -b "$ZYDIS_VERSION" https://github.com/zyantific/zydis.git "$work/zydis"
-    common=(-G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$prefix" -DBUILD_SHARED_LIBS=OFF)
+    common=(-G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$prefix" -DBUILD_SHARED_LIBS=OFF)
     [[ ${#arch[@]} == 0 ]] || common+=(-DCMAKE_OSX_ARCHITECTURES="${arch[1]}")
     # Zydis and Zycore ask for CMake < 3.10, which CMake 4 deprecates; 3.10 policies keep them building.
     common+=(-DCMAKE_POLICY_VERSION_MINIMUM=3.10)
     # Zydis builds its bundled Zycore without install rules: Zycore first, then Zydis on it.
     cmake -S "$work/zydis/dependencies/zycore" -B "$work/zycore-build" "${common[@]}" >/dev/null
-    cmake --build "$work/zycore-build" >/dev/null && cmake --install "$work/zycore-build" >/dev/null
+    cmake --build "$work/zycore-build" --parallel "$jobs" >/dev/null && cmake --install "$work/zycore-build" >/dev/null
     cmake -S "$work/zydis" -B "$work/zydis-build" "${common[@]}" -DZYAN_SYSTEM_ZYCORE=ON \
         -DCMAKE_C_FLAGS="-I$prefix/include" -DZYDIS_BUILD_TOOLS=OFF -DZYDIS_BUILD_EXAMPLES=OFF \
         -DZYDIS_BUILD_DOXYGEN=OFF >/dev/null
-    cmake --build "$work/zydis-build" >/dev/null && cmake --install "$work/zydis-build" >/dev/null
+    cmake --build "$work/zydis-build" --parallel "$jobs" >/dev/null && cmake --install "$work/zydis-build" >/dev/null
 fi
 
 mkdir -p out/cpu

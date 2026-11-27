@@ -23,7 +23,7 @@ jobs:
       # with AVX instructions bbcpu does not implement (the games it was written for do not use them).
       - name: Tools
         run: |
-          brew install ninja llvm
+          brew install llvm
           echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
           /usr/bin/pgrep -q oahd || softwareupdate --install-rosetta --agree-to-license
 
